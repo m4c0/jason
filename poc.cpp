@@ -150,6 +150,10 @@ namespace ast::nodes {
     constexpr array() : node { ast::array } {}
   };
   class string : public node {
+    jute::view m_raw {};
+  public:
+    explicit constexpr string(jute::view cnt) : node { ast::string }, m_raw { cnt } {}
+    constexpr auto raw() const { return m_raw; }
   };
   class number : public node {
   };
@@ -218,6 +222,7 @@ namespace ast {
     switch (t) {
       case token::l_brace: return parse_dict(ts);
       case token::l_bracket: return parse_array(ts);
+      case token::string: return new nodes::string { cnt };
       case token::null: return new nodes::null {};
       default: fail("found token in a invalid position", {t, cnt});
     }
