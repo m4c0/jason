@@ -177,8 +177,7 @@ namespace ast {
         case token::r_bracket: 
           ts.take();
           return new nodes::array { res };
-        case token::l_brace: value = parse_dict(ts); break;
-        default: fail("invalid token while parsing array", ts.peek());
+        default: value = parse(ts); break;
       }
       // TODO: add value to arr
       
@@ -220,7 +219,7 @@ namespace ast {
       case token::l_brace: return parse_dict(ts);
       case token::l_bracket: return parse_array(ts);
       case token::null: return new nodes::null {};
-      default: silog::die("found token in a invalid position");
+      default: fail("found token in a invalid position", {t, cnt});
     }
   }
 }
