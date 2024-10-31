@@ -15,11 +15,15 @@ int main() try {
     using namespace jason::ast::nodes;
     for (auto & n : cast<array>(node)) {
       auto & notif = cast<dict>(n);
-      silog::trace("id", cast<string>(notif["id"]).str());
-      silog::trace("reason", cast<string>(notif["reason"]).str());
-
       auto & subj = cast<dict>(notif["subject"]);
-      silog::trace("title", cast<string>(subj["title"]).str());
+
+      auto id = cast<string>(notif["id"]).str();
+      auto reason = cast<string>(notif["reason"]).str() + "                    ";
+      auto title = cast<string>(subj["title"]).str();
+      silog::log(silog::info, "%.*s %.20s %.*s",
+          static_cast<int>(id.size()), id.begin(),
+          reason.begin(),
+          static_cast<int>(title.size()), title.begin());
     }
   });
 } catch (...) {
