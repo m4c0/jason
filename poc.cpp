@@ -148,13 +148,17 @@ namespace ast {
 }
 namespace ast::nodes {
   class dict : public node_typed<ast::dict> {
-    hai::chain<hai::uptr<node>> m_values { 64 };
+    struct entry {
+      jute::view key;
+      hai::uptr<node> value;
+    };
+    hai::chain<entry> m_values { 64 };
     hashley::niamh m_keys { 127 };
   public:
     constexpr void push_back(jute::view key, node * value) {
       auto & k = m_keys[key];
       if (k) silog::die("duplicate key found in dict");
-      m_values.push_back(hai::uptr { value });
+      m_values.push_back({ key, hai::uptr { value }});
       k = m_values.size();
     }
 
@@ -165,8 +169,12 @@ namespace ast::nodes {
     [[nodiscard]] constexpr auto & operator[](jute::view key) const {
       auto k = m_keys[key];
       if (!k) silog::die("key not found in dict");
-      return m_values.seek(k - 1);
+      return m_values.seek(k - 1).value;
     }
+
+    constexpr auto size() const { return m_values.size(); }
+    constexpr auto begin() const { return m_values.begin(); }
+    constexpr auto end() const { return m_values.end(); }
   };
   class array : public node_typed<ast::array> {
     hai::chain<hai::uptr<node>> m_data { 64 };
@@ -283,9 +291,11 @@ int main() try {
     auto tokens = tokenise(jute::view { data.begin(), data.size() });
     auto node = parse(tokens);
 
-    for (auto & v : cast<ast::nodes::array>(node)) {
-      auto & d = cast<ast::nodes::dict>(v);
-      silog::trace("id", cast<ast::nodes::string>(d["id"]).raw());
+    for (auto & n : cast<ast::nodes::array>(node)) {
+      auto & notif = cast<ast::nodes::dict>(n);
+      for (auto &[k, v] : notif) {
+        silog::trace(k, v->type());
+      }
     }
   });
 } catch (...) {
