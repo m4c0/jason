@@ -149,14 +149,14 @@ namespace ast {
 namespace ast::nodes {
   class dict : public node_typed<ast::dict> {
     struct entry {
-      jute::view key;
+      jute::heap key;
       hai::uptr<node> value;
     };
     hai::chain<entry> m_values { 64 };
     hashley::niamh m_keys { 127 };
   public:
-    constexpr void push_back(jute::view key, node * value) {
-      auto & k = m_keys[key];
+    constexpr void push_back(jute::heap key, node * value) {
+      auto & k = m_keys[*key];
       if (k) silog::die("duplicate key found in dict");
       m_values.push_back({ key, hai::uptr { value }});
       k = m_values.size();
@@ -218,6 +218,21 @@ namespace ast {
     silog::die("%s: %.*s", msg, static_cast<int>(t.content.size()), t.content.begin());
   }
 
+  [[nodiscard]] constexpr auto unescape(jute::view txt) {
+    hai::array<char> buffer { static_cast<unsigned>(txt.size()) };
+    auto ptr = buffer.begin();
+    unsigned i;
+    for (i = 1; i < txt.size() - 1; i++, ptr++) {
+      if (txt[i] == '\\') *ptr = txt[++i];
+      else *ptr = txt[i];
+    }
+    unsigned len = ptr - buffer.begin();
+    return jute::heap { jute::view { buffer.begin(), len } };
+  }
+  static_assert(*unescape("\"asdf\"") == "asdf");
+  static_assert(*unescape("\"a\\sdf\"") == "asdf");
+  static_assert(*unescape("\"a\\\"sdf\"") == "a\"sdf");
+
   node * parse_array(token::list & ts) {
     nodes::array res {};
     while (ts) {
@@ -246,7 +261,7 @@ namespace ast {
         while (ts) {
           auto key = ts.take();
           if (ts.take().type != token::colon) fail("expecting colon after key", key);
-          res.push_back(key.content, parse(ts));
+          res.push_back(unescape(key.content), parse(ts));
 
           switch (ts.take().type) {
             case token::comma: continue;
@@ -294,7 +309,7 @@ int main() try {
     for (auto & n : cast<ast::nodes::array>(node)) {
       auto & notif = cast<ast::nodes::dict>(n);
       for (auto &[k, v] : notif) {
-        silog::trace(k, v->type());
+        silog::trace(*k, v->type());
       }
     }
   });
