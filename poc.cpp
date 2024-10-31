@@ -1,6 +1,7 @@
 #pragma leco tool
 
 import hai;
+import hashley;
 import jojo;
 import jute;
 import silog;
@@ -139,16 +140,37 @@ namespace ast {
 
     constexpr auto type() const { return m_type; }
   };
+  template<type T>
+  struct node_typed : public node {
+    static constexpr const ast::type type = T;
+    constexpr node_typed() : node { T } {}
+  };
 }
 namespace ast::nodes {
-  class dict : public node {
+  class dict : public node_typed<ast::dict> {
+    hai::chain<hai::uptr<node>> m_values { 64 };
+    hashley::niamh m_keys { 127 };
   public:
-    constexpr dict() : node { ast::dict } {}
+    constexpr void push_back(jute::view key, node * value) {
+      auto & k = m_keys[key];
+      if (k) silog::die("duplicate key found in dict");
+      m_values.push_back(hai::uptr { value });
+      k = m_values.size();
+    }
+
+    [[nodiscard]] constexpr bool has_key(jute::view key) const {
+      return m_keys[key] != 0;
+    }
+
+    [[nodiscard]] constexpr auto & operator[](jute::view key) const {
+      auto k = m_keys[key];
+      if (!k) silog::die("key not found in dict");
+      return m_values.seek(k - 1);
+    }
   };
-  class array : public node {
-    hai::chain<hai::uptr<node>> m_data { 1024 };
+  class array : public node_typed<ast::array> {
+    hai::chain<hai::uptr<node>> m_data { 64 };
   public:
-    constexpr array() : node { ast::array } {}
     constexpr void push_back(node * n) {
       m_data.push_back(hai::uptr { n });
     }
@@ -157,28 +179,26 @@ namespace ast::nodes {
     constexpr auto begin() const { return m_data.begin(); }
     constexpr auto end() const { return m_data.end(); }
   };
-  class string : public node {
+  class string : public node_typed<ast::string> {
     jute::view m_raw {};
   public:
-    explicit constexpr string(jute::view cnt) : node { ast::string }, m_raw { cnt } {}
+    explicit constexpr string(jute::view cnt) : m_raw { cnt } {}
     constexpr auto raw() const { return m_raw; }
   };
-  class number : public node {
+  class number : public node_typed<ast::number> {
     // Stored "raw" for easier conversion based on precision, etc
     jute::view m_raw {};
   public:
-    explicit constexpr number(jute::view cnt) : node { ast::number }, m_raw { cnt } {}
+    explicit constexpr number(jute::view cnt) : m_raw { cnt } {}
     constexpr auto raw() const { return m_raw; }
   };
-  class boolean : public node {
+  class boolean : public node_typed<ast::boolean> {
     bool m_val {};
   public:
-    explicit constexpr boolean(bool b) : node { ast::boolean }, m_val { b } {}
+    explicit constexpr boolean(bool b) : m_val { b } {}
     constexpr operator bool() const { return m_val; }
   };
-  class null : public node {
-  public:
-    constexpr null() : node { ast::null } {}
+  class null : public node_typed<ast::null> {
   };
 }
 namespace ast {
@@ -213,7 +233,7 @@ namespace ast {
     switch (ts.peek().type) {
       case token::r_brace:
         ts.take();
-        return new nodes::dict { res };
+        return new nodes::dict { traits::move(res) };
       case token::string: 
         while (ts) {
           auto key = ts.take();
@@ -222,7 +242,7 @@ namespace ast {
 
           switch (ts.take().type) {
             case token::comma: continue;
-            case token::r_brace: return new nodes::dict { res };
+            case token::r_brace: return new nodes::dict { traits::move(res) };
             default: fail("invalid token after dict entry", key);
           }
         }
@@ -244,6 +264,11 @@ namespace ast {
       default: fail("found token in a invalid position", {t, cnt});
     }
   }
+
+  template<typename N> const N & cast(const hai::uptr<node> & node) {
+    if (node->type() != N::type) silog::die("expecting type %d got %d", N::type, node->type());
+    return static_cast<const N &>(*node);
+  }
 }
 auto parse(token::list & ts) {
   ts.reset();
@@ -258,9 +283,9 @@ int main() try {
     auto tokens = tokenise(jute::view { data.begin(), data.size() });
     auto node = parse(tokens);
 
-    if (node->type() != ast::array) silog::die("not an array");
-    for (auto & v : static_cast<ast::nodes::array &>(*node)) {
-      silog::trace("type", v->type());
+    for (auto & v : cast<ast::nodes::array>(node)) {
+      auto & d = cast<ast::nodes::dict>(v);
+      silog::trace("id", cast<ast::nodes::string>(d["id"]).raw());
     }
   });
 } catch (...) {
