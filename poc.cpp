@@ -156,8 +156,17 @@ namespace ast::nodes {
     constexpr auto raw() const { return m_raw; }
   };
   class number : public node {
+    // Stored "raw" for easier conversion based on precision, etc
+    jute::view m_raw {};
+  public:
+    explicit constexpr number(jute::view cnt) : node { ast::number }, m_raw { cnt } {}
+    constexpr auto raw() const { return m_raw; }
   };
   class boolean : public node {
+    bool m_val {};
+  public:
+    explicit constexpr boolean(bool b) : node { ast::boolean }, m_val { b } {}
+    constexpr operator bool() const { return m_val; }
   };
   class null : public node {
   public:
@@ -222,6 +231,8 @@ namespace ast {
     switch (t) {
       case token::l_brace: return parse_dict(ts);
       case token::l_bracket: return parse_array(ts);
+      case token::boolean: return new nodes::boolean { "true" == cnt };
+      case token::number: return new nodes::number { cnt };
       case token::string: return new nodes::string { cnt };
       case token::null: return new nodes::null {};
       default: fail("found token in a invalid position", {t, cnt});
