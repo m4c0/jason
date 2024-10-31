@@ -23,10 +23,27 @@ namespace token {
     type type {};
     jute::view content {};
   };
+  class list {
+    hai::chain<t> m_list { 10240 };
+    hai::chain<t>::const_iterator m_it;
+  public:
+    void push_back(t t) { m_list.push_back(t); }
+
+    auto peek() { return *m_it; }
+    auto take() {
+      auto res = peek();
+      auto _ = ++m_it;
+      return res;
+    }
+
+    [[nodiscard]] constexpr operator bool() const {
+      return m_it != m_list.end();
+    }
+  };
 }
 
-static constexpr hai::chain<token::t> tokenise(jute::view data) {
-  hai::chain<token::t> res { 1024 };
+static constexpr token::list tokenise(jute::view data) {
+  token::list res {};
   while (data.size()) {
     const auto err = [&] (const char * msg) {
       silog::die("%s [%.*s]",
@@ -94,14 +111,67 @@ static constexpr hai::chain<token::t> tokenise(jute::view data) {
   }
   return res;
 }
+namespace ast {
+  enum type {
+    error,
+    dict,
+    array,
+    string,
+    boolean,
+    null,
+    number,
+  };
+  class node {
+    type m_type {};
+
+  protected:
+    explicit constexpr node(type t) : m_type { t } {}
+
+  public:
+    constexpr node() = default;
+    virtual ~node() {}
+
+    constexpr auto type() const { return m_type; }
+  };
+}
+namespace ast::nodes {
+  class dict : public node {
+  };
+  class array : public node {
+  };
+  class string : public node {
+  };
+  class number : public node {
+  };
+  class boolean : public node {
+  };
+  class null : public node {
+  public:
+    constexpr null() : node { ast::null } {}
+  };
+  class error : public node {
+  public:
+    constexpr error() : node { ast::error } {}
+  };
+}
+auto parse(token::list & ts) {
+  using res = hai::uptr<ast::node>;
+  if (!ts) return res { new ast::nodes::error {} };
+
+  auto [t, cnt] = ts.take();
+  switch (t) {
+    case token::null: return res { new ast::nodes::null {} };
+    default: return res { new ast::nodes::error {} };
+  }
+}
 
 int main() try {
   // Reads from GitHub's notification API
   jojo::read("out/test.json", nullptr, [](auto, const hai::array<char> & data) {
     auto tokens = tokenise(jute::view { data.begin(), data.size() });
-    for (auto & t : tokens) {
-      silog::trace(t.content);
-    }
+    auto node = parse(tokens);
+    silog::trace(node->type());
+    if (tokens) silog::die("extra tokens");
   });
 } catch (...) {
   return 1;
