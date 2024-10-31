@@ -29,9 +29,15 @@ namespace token {
   public:
     void push_back(t t) { m_list.push_back(t); }
 
-    auto peek() { return *m_it; }
+    void reset() { m_it = static_cast<const hai::chain<t> &>(m_list).begin(); }
+
+    auto peek() {
+      if (!*this) silog::die("end of token list");
+      return *m_it; 
+    }
     auto take() {
-      auto res = peek();
+      if (!*this) silog::die("end of token list");
+      auto res = *m_it;
       auto _ = ++m_it;
       return res;
     }
@@ -136,8 +142,12 @@ namespace ast {
 }
 namespace ast::nodes {
   class dict : public node {
+  public:
+    constexpr dict() : node { ast::dict } {}
   };
   class array : public node {
+  public:
+    constexpr array() : node { ast::array } {}
   };
   class string : public node {
   };
@@ -149,20 +159,74 @@ namespace ast::nodes {
   public:
     constexpr null() : node { ast::null } {}
   };
-  class error : public node {
-  public:
-    constexpr error() : node { ast::error } {}
-  };
+}
+namespace ast {
+  node * parse(token::list & ts);
+  node * parse_array(token::list & ts);
+  node * parse_dict(token::list & ts);
+
+  [[noreturn]] void fail(const char * msg, token::t t) {
+    silog::die("%s: %.*s", msg, static_cast<int>(t.content.size()), t.content.begin());
+  }
+
+  node * parse_array(token::list & ts) {
+    nodes::array res {};
+    while (ts) {
+      node * value;
+      switch (ts.peek().type) {
+        case token::r_bracket: 
+          ts.take();
+          return new nodes::array { res };
+        case token::l_brace: value = parse_dict(ts); break;
+        default: fail("invalid token while parsing array", ts.peek());
+      }
+      // TODO: add value to arr
+      
+      switch (ts.take().type) {
+        case token::r_bracket: return new nodes::array { res };
+        case token::comma: continue;
+        default: fail("invalid token while parsing array before", ts.peek());
+      }
+    }
+    silog::die("end of file while parsing array");
+  }
+  node * parse_dict(token::list & ts) {
+    nodes::dict res {};
+    switch (ts.peek().type) {
+      case token::r_brace:
+        ts.take();
+        return new nodes::dict { res };
+      case token::string: 
+        while (ts) {
+          auto key = ts.take();
+          if (ts.take().type != token::colon) fail("expecting colon after key", key);
+          auto value = parse(ts);
+
+          switch (ts.take().type) {
+            case token::comma: continue;
+            case token::r_brace: return new nodes::dict { res };
+            default: fail("invalid token after dict entry", key);
+          }
+        }
+        silog::die("end of file while parsing dict");
+      default: fail("invalid token while parsing dict", ts.peek());
+    }
+  }
+  node * parse(token::list & ts) {
+    if (!ts) silog::die("eof trying to parse a value");
+
+    auto [t, cnt] = ts.take();
+    switch (t) {
+      case token::l_brace: return parse_dict(ts);
+      case token::l_bracket: return parse_array(ts);
+      case token::null: return new nodes::null {};
+      default: silog::die("found token in a invalid position");
+    }
+  }
 }
 auto parse(token::list & ts) {
-  using res = hai::uptr<ast::node>;
-  if (!ts) return res { new ast::nodes::error {} };
-
-  auto [t, cnt] = ts.take();
-  switch (t) {
-    case token::null: return res { new ast::nodes::null {} };
-    default: return res { new ast::nodes::error {} };
-  }
+  ts.reset();
+  return hai::uptr<ast::node> { ast::parse(ts) };
 }
 
 int main() try {
