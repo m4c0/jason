@@ -5,7 +5,7 @@ import jason;
 import hai;
 import jojo;
 import jute;
-import silog;
+import print;
 
 int main() try {
   // Reads from GitHub's notification API
@@ -20,10 +20,7 @@ int main() try {
       auto id = cast<string>(notif["id"]).str();
       auto reason = cast<string>(notif["reason"]).str() + "                    ";
       auto title = cast<string>(subj["title"]).str();
-      silog::log(silog::info, "%.*s %.20s %.*s",
-          static_cast<int>(id.size()), id.begin(),
-          reason.begin(),
-          static_cast<int>(title.size()), title.begin());
+      putln(id, ' ', (*reason).subview(0, 20).middle, title);
     }
   });
 } catch (...) {
