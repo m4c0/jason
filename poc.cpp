@@ -238,7 +238,7 @@ namespace ast {
         while (ts) {
           auto key = ts.take();
           if (ts.take().type != token::colon) fail("expecting colon after key", key);
-          auto _ = parse(ts);
+          res.push_back(key.content, parse(ts));
 
           switch (ts.take().type) {
             case token::comma: continue;
