@@ -307,9 +307,14 @@ int main() try {
     auto tokens = tokenise(jute::view { data.begin(), data.size() });
     auto node = parse(tokens);
 
-    for (auto & n : cast<ast::nodes::array>(node)) {
-      auto & notif = cast<ast::nodes::dict>(n);
-      silog::trace("id", cast<ast::nodes::string>(notif["id"]).str());
+    using namespace ast::nodes;
+    for (auto & n : cast<array>(node)) {
+      auto & notif = cast<dict>(n);
+      silog::trace("id", cast<string>(notif["id"]).str());
+      silog::trace("reason", cast<string>(notif["reason"]).str());
+
+      auto & subj = cast<dict>(notif["subject"]);
+      silog::trace("title", cast<string>(subj["title"]).str());
     }
   });
 } catch (...) {
