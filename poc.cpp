@@ -146,8 +146,16 @@ namespace ast::nodes {
     constexpr dict() : node { ast::dict } {}
   };
   class array : public node {
+    hai::chain<hai::uptr<node>> m_data { 1024 };
   public:
     constexpr array() : node { ast::array } {}
+    constexpr void push_back(node * n) {
+      m_data.push_back(hai::uptr { n });
+    }
+
+    constexpr auto size() const { return m_data.size(); }
+    constexpr auto begin() const { return m_data.begin(); }
+    constexpr auto end() const { return m_data.end(); }
   };
   class string : public node {
     jute::view m_raw {};
@@ -185,17 +193,15 @@ namespace ast {
   node * parse_array(token::list & ts) {
     nodes::array res {};
     while (ts) {
-      node * value;
       switch (ts.peek().type) {
         case token::r_bracket: 
           ts.take();
-          return new nodes::array { res };
-        default: value = parse(ts); break;
+          return new nodes::array { traits::move(res) };
+        default: res.push_back(parse(ts)); break;
       }
-      // TODO: add value to arr
       
       switch (ts.take().type) {
-        case token::r_bracket: return new nodes::array { res };
+        case token::r_bracket: return new nodes::array { traits::move(res) };
         case token::comma: continue;
         default: fail("invalid token while parsing array before", ts.peek());
       }
@@ -212,7 +218,7 @@ namespace ast {
         while (ts) {
           auto key = ts.take();
           if (ts.take().type != token::colon) fail("expecting colon after key", key);
-          auto value = parse(ts);
+          auto _ = parse(ts);
 
           switch (ts.take().type) {
             case token::comma: continue;
@@ -241,7 +247,9 @@ namespace ast {
 }
 auto parse(token::list & ts) {
   ts.reset();
-  return hai::uptr<ast::node> { ast::parse(ts) };
+  auto * res = ast::parse(ts);
+  if (ts) ast::fail("extra tokens after valid value, starting from", ts.peek());
+  return hai::uptr<ast::node> { res };
 }
 
 int main() try {
@@ -249,8 +257,11 @@ int main() try {
   jojo::read("out/test.json", nullptr, [](auto, const hai::array<char> & data) {
     auto tokens = tokenise(jute::view { data.begin(), data.size() });
     auto node = parse(tokens);
-    silog::trace(node->type());
-    if (tokens) silog::die("extra tokens");
+
+    if (node->type() != ast::array) silog::die("not an array");
+    for (auto & v : static_cast<ast::nodes::array &>(*node)) {
+      silog::trace("type", v->type());
+    }
   });
 } catch (...) {
   return 1;
