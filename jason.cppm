@@ -87,8 +87,14 @@ namespace jason {
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9': {
           auto origin = data;
-          while (data.size() && data[0] >= '0' && data[1] <= '9') {
-            data = data.subview(1).after;
+          while (data.size() && data[0] >= '0' && data[0] <= '9') {
+            data = data.subview(0, 1).after;
+          }
+          if (data.size() && data[0] == '.') {
+            data = data.subview(0, 1).after;
+            while (data.size() && data[0] >= '0' && data[0] <= '9') {
+              data = data.subview(0, 1).after;
+            }
           }
           auto len = static_cast<unsigned>(data.begin() - origin.begin());
           jute::view val { origin.begin(), len };
