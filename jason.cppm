@@ -153,6 +153,7 @@ namespace jason::ast {
     static constexpr const ast::type type = T;
     constexpr node_typed() : node { T } {}
   };
+  export using node_ptr = hai::uptr<node>;
 
   [[nodiscard]] constexpr auto unescape(jute::view txt) {
     hai::array<char> buffer { static_cast<unsigned>(txt.size()) };
@@ -173,7 +174,7 @@ export namespace jason::ast::nodes {
   class dict : public node_typed<ast::dict> {
     struct entry {
       jute::heap key;
-      hai::uptr<node> value;
+      node_ptr value;
     };
     hai::chain<entry> m_values { 64 };
     hashley::niamh m_keys { 127 };
@@ -200,7 +201,7 @@ export namespace jason::ast::nodes {
     constexpr auto end() const { return m_values.end(); }
   };
   class array : public node_typed<ast::array> {
-    hai::chain<hai::uptr<node>> m_data { 64 };
+    hai::chain<node_ptr> m_data { 64 };
   public:
     constexpr void push_back(node * n) {
       m_data.push_back(hai::uptr { n });
@@ -312,7 +313,7 @@ namespace jason::ast {
     }
   }
 
-  export template<typename N> constexpr const N & cast(const hai::uptr<node> & node) {
+  export template<typename N> constexpr const N & cast(const node_ptr & node) {
     if (node->type() != N::type) silog::die("expecting type %d got %d", N::type, node->type());
     return static_cast<const N &>(*node);
   }
@@ -322,7 +323,7 @@ namespace jason {
     ts.reset();
     auto * res = ast::parse(ts);
     if (ts) ast::fail("extra tokens after valid value, starting from", ts.peek());
-    return hai::uptr<ast::node> { res };
+    return ast::node_ptr { res };
   }
 
   export constexpr auto parse(jute::view json) {
