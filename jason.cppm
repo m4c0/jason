@@ -222,6 +222,15 @@ export namespace jason::ast::nodes {
   public:
     explicit constexpr number(jute::view cnt) : m_raw { cnt } {}
     constexpr auto raw() const { return m_raw; }
+    constexpr auto integer() const {
+      auto d = m_raw;
+      int res {};
+      while (d.size()) {
+        res = res * 10 + (d[0] - '0');
+        d = d.subview(0, 1).after;
+      }
+      return res;
+    }
   };
   class boolean : public node_typed<ast::boolean> {
     bool m_val {};
