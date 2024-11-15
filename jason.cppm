@@ -70,6 +70,7 @@ namespace jason {
           data = r;
         } else err("unexpected input starting at ");
       };
+      jute::view origin = data;
       switch (data[0]) { 
         case '[': push(token::l_bracket); break;
         case ']': push(token::r_bracket); break;
@@ -84,9 +85,9 @@ namespace jason {
         case '\t':
         case '\r':
         case '\n': data = data.subview(1).after; break;
+        case '-': data = data.subview(1).after; // fall-through
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9': {
-          auto origin = data;
           while (data.size() && data[0] >= '0' && data[0] <= '9') {
             data = data.subview(0, 1).after;
           }
@@ -97,12 +98,12 @@ namespace jason {
             }
           }
           auto len = static_cast<unsigned>(data.begin() - origin.begin());
+          if (len == 1 && origin[0] == '-') err("invalid number at ");
           jute::view val { origin.begin(), len };
           res.push_back({ token::number, val });
           break;
         }
         case '"': {
-          auto origin = data;
           do {
             data = data.subview(1).after;
             if (data.size() && data[0] == '\\') data = data.subview(2).after;
@@ -228,12 +229,13 @@ export namespace jason::ast::nodes {
     explicit constexpr number(jute::view cnt) : m_raw { cnt } {}
     constexpr auto raw() const { return m_raw; }
     constexpr auto integer() const {
-      auto d = m_raw;
+      auto d = (m_raw[0] == '-') ? m_raw.subview(0, 1).after : m_raw;
       int res {};
       while (d.size()) {
         res = res * 10 + (d[0] - '0');
         d = d.subview(0, 1).after;
       }
+      if (m_raw[0] == '-') res *= -1;
       return res;
     }
   };
