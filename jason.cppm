@@ -27,15 +27,15 @@ namespace jason::token {
     hai::chain<t> m_list { 10240 };
     hai::chain<t>::const_iterator m_it;
   public:
-    void push_back(t t) { m_list.push_back(t); }
+    constexpr void push_back(t t) { m_list.push_back(t); }
 
-    void reset() { m_it = static_cast<const hai::chain<t> &>(m_list).begin(); }
+    constexpr void reset() { m_it = static_cast<const hai::chain<t> &>(m_list).begin(); }
 
-    auto peek() {
+    constexpr auto peek() {
       if (!*this) silog::die("end of token list");
       return *m_it; 
     }
-    auto take() {
+    constexpr auto take() {
       if (!*this) silog::die("end of token list");
       auto res = *m_it;
       auto _ = ++m_it;
@@ -143,7 +143,7 @@ namespace jason::ast {
 
   public:
     constexpr node() = default;
-    virtual ~node() {}
+    constexpr virtual ~node() {}
 
     constexpr auto type() const { return m_type; }
   };
@@ -205,6 +205,11 @@ export namespace jason::ast::nodes {
       m_data.push_back(hai::uptr { n });
     }
 
+    [[nodiscard]] constexpr auto & operator[](unsigned idx) const {
+      if (idx >= m_data.size()) silog::die("accessing element outside array bounds");
+      return m_data.seek(idx);
+    }
+
     constexpr auto size() const { return m_data.size(); }
     constexpr auto begin() const { return m_data.begin(); }
     constexpr auto end() const { return m_data.end(); }
@@ -242,15 +247,15 @@ export namespace jason::ast::nodes {
   };
 }
 namespace jason::ast {
-  node * parse(token::list & ts);
-  node * parse_array(token::list & ts);
-  node * parse_dict(token::list & ts);
+  constexpr node * parse(token::list & ts);
+  constexpr node * parse_array(token::list & ts);
+  constexpr node * parse_dict(token::list & ts);
 
   [[noreturn]] void fail(const char * msg, token::t t) {
     silog::die("%s: %.*s", msg, static_cast<int>(t.content.size()), t.content.begin());
   }
 
-  node * parse_array(token::list & ts) {
+  constexpr node * parse_array(token::list & ts) {
     nodes::array res {};
     while (ts) {
       switch (ts.peek().type) {
@@ -268,7 +273,7 @@ namespace jason::ast {
     }
     silog::die("end of file while parsing array");
   }
-  node * parse_dict(token::list & ts) {
+  constexpr node * parse_dict(token::list & ts) {
     nodes::dict res {};
     switch (ts.peek().type) {
       case token::r_brace:
@@ -290,7 +295,7 @@ namespace jason::ast {
       default: fail("invalid token while parsing dict", ts.peek());
     }
   }
-  node * parse(token::list & ts) {
+  constexpr node * parse(token::list & ts) {
     if (!ts) silog::die("eof trying to parse a value");
 
     auto [t, cnt] = ts.take();
@@ -305,22 +310,34 @@ namespace jason::ast {
     }
   }
 
-  export template<typename N> const N & cast(const hai::uptr<node> & node) {
+  export template<typename N> constexpr const N & cast(const hai::uptr<node> & node) {
     if (node->type() != N::type) silog::die("expecting type %d got %d", N::type, node->type());
     return static_cast<const N &>(*node);
   }
 }
 namespace jason {
-  auto parse(token::list & ts) {
+  constexpr auto parse(token::list & ts) {
     ts.reset();
     auto * res = ast::parse(ts);
     if (ts) ast::fail("extra tokens after valid value, starting from", ts.peek());
     return hai::uptr<ast::node> { res };
   }
 
-  export auto parse(jute::view json) {
+  export constexpr auto parse(jute::view json) {
     auto tokens = tokenise(json);
     return parse(tokens);
   }
 }
 
+module :private;
+static_assert([] {
+  auto json = jason::parse(R"(
+    { "hello": 1,
+      "world": [ "!!", true ] }
+  )");
+
+  using namespace jason::ast::nodes;
+  auto & world = cast<dict>(json)["world"];
+  auto & t = cast<array>(world);
+  return cast<boolean>(t[1]);
+}());
