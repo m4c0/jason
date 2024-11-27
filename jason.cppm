@@ -192,7 +192,7 @@ export namespace jason::ast::nodes {
 
     [[nodiscard]] constexpr auto & operator[](jute::view key) const {
       auto k = m_keys[key];
-      if (!k) silog::die("key not found in dict");
+      if (!k) silog::die("key not found in dict: [%s]", key.cstr().begin());
       return m_values.seek(k - 1).value;
     }
 
