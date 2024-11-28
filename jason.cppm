@@ -321,17 +321,33 @@ namespace jason::ast {
   }
 }
 namespace jason {
-  constexpr auto parse(token::list & ts) {
+  export constexpr auto partial_parse(jute::view json) {
+    struct {
+      ast::node_ptr node {};
+      jute::view rest {};
+    } res;
+
+    auto ts = tokenise(json);
     ts.reset();
-    if (!ts) return ast::node_ptr {};
-    auto * res = ast::parse(ts);
-    if (ts) ast::fail("extra tokens after valid value, starting from", ts.peek());
-    return ast::node_ptr { res };
+    if (!ts) return res;
+
+    res.node = ast::node_ptr { ast::parse(ts) };
+    if (!ts) return res;
+
+    auto r = ts.peek().content.begin() - json.begin();
+    res.rest = json.subview(r).after;
+    return res;
   }
 
   export constexpr auto parse(jute::view json) {
-    auto tokens = tokenise(json);
-    return parse(tokens);
+    auto ts = tokenise(json);
+    ts.reset();
+    if (!ts) return ast::node_ptr {};
+
+    auto * res = ast::parse(ts);
+    if (ts) ast::fail("extra tokens after valid value, starting from", ts.peek());
+
+    return ast::node_ptr { res };
   }
 }
 
@@ -355,4 +371,8 @@ static_assert([] {
   auto json = jason::parse("0");
   using namespace jason::ast::nodes;
   return cast<number>(json).integer() == 0;
+}());
+static_assert([] {
+  auto [json, rest] = jason::partial_parse("0 0 0");
+  return rest == "0 0";
 }());
