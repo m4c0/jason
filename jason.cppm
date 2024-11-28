@@ -321,6 +321,7 @@ namespace jason::ast {
 namespace jason {
   constexpr auto parse(token::list & ts) {
     ts.reset();
+    if (!ts) return ast::node_ptr {};
     auto * res = ast::parse(ts);
     if (ts) ast::fail("extra tokens after valid value, starting from", ts.peek());
     return ast::node_ptr { res };
@@ -343,4 +344,8 @@ static_assert([] {
   auto & world = cast<dict>(json)["world"];
   auto & t = cast<array>(world);
   return cast<boolean>(t[1]);
+}());
+static_assert([] {
+  auto json = jason::parse("");
+  return true;
 }());
