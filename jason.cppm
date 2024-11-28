@@ -97,7 +97,9 @@ namespace jason {
               data = data.subview(0, 1).after;
             }
           }
-          auto len = static_cast<unsigned>(data.begin() - origin.begin());
+          auto len = data.size() == 0
+            ? origin.size()
+            : static_cast<unsigned>(data.begin() - origin.begin());
           if (len == 1 && origin[0] == '-') err("invalid number at ");
           jute::view val { origin.begin(), len };
           res.push_back({ token::number, val });
@@ -348,4 +350,9 @@ static_assert([] {
 static_assert([] {
   auto json = jason::parse("");
   return true;
+}());
+static_assert([] {
+  auto json = jason::parse("0");
+  using namespace jason::ast::nodes;
+  return cast<number>(json).integer() == 0;
 }());
