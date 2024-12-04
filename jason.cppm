@@ -59,10 +59,11 @@ namespace jason {
   constexpr token::t take_string(jute::view & data) {
     jute::view origin = data;
 
-    do {
-      data = data.subview(1).after;
+    data = data.subview(1).after;
+    while (data.size() && data[0] != '"') {
       if (data.size() && data[0] == '\\') data = data.subview(2).after;
-    } while (data.size() && data[0] != '"');
+      else data = data.subview(1).after;
+    }
 
     if (data.size() == 0) err(origin, "unmatched string started at ");
     data = data.subview(1).after;
@@ -373,6 +374,11 @@ static_assert([] {
   auto json = jason::parse(R"("test")");
   using namespace jason::ast::nodes;
   return *cast<string>(json).str() == "test";
+}());
+static_assert([] {
+  auto json = jason::parse(R"("escape\n\"test")");
+  using namespace jason::ast::nodes;
+  return *cast<string>(json).str() == "escapen\"test";
 }());
 static_assert([] {
   auto json = jason::parse("0");
