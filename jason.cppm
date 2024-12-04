@@ -165,14 +165,19 @@ namespace jason::ast {
     auto ptr = buffer.begin();
     unsigned i;
     for (i = 1; i < txt.size() - 1; i++, ptr++) {
-      if (txt[i] == '\\') *ptr = txt[++i];
-      else *ptr = txt[i];
+      if (txt[i] != '\\') {
+        *ptr = txt[i];
+        continue;
+      }
+      *ptr = txt[i + 1] == 'n' ? '\n' : txt[i + 1];
+      i++;
     }
     unsigned len = ptr - buffer.begin();
     return jute::heap { jute::view { buffer.begin(), len } };
   }
   static_assert(*unescape("\"asdf\"") == "asdf");
   static_assert(*unescape("\"a\\sdf\"") == "asdf");
+  static_assert(*unescape("\"a\\ndf\"") == "a\ndf");
   static_assert(*unescape("\"a\\\"sdf\"") == "a\"sdf");
 }
 export namespace jason::ast::nodes {
@@ -378,7 +383,7 @@ static_assert([] {
 static_assert([] {
   auto json = jason::parse(R"("escape\n\"test")");
   using namespace jason::ast::nodes;
-  return *cast<string>(json).str() == "escapen\"test";
+  return *cast<string>(json).str() == "escape\n\"test";
 }());
 static_assert([] {
   auto json = jason::parse("0");
