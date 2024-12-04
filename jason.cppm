@@ -49,15 +49,33 @@ namespace jason::token {
 }
 
 namespace jason {
+  [[noreturn]] constexpr void err(jute::view data, const char * msg) {
+    silog::die("%s [%.*s]",
+        msg,
+        static_cast<unsigned>(data.size() > 20 ? 20 : data.size()),
+        data.begin());
+  }
+
+  constexpr token::t take_string(jute::view & data) {
+    jute::view origin = data;
+
+    do {
+      data = data.subview(1).after;
+      if (data.size() && data[0] == '\\') data = data.subview(2).after;
+    } while (data.size() && data[0] != '"');
+
+    if (data.size() == 0) err(origin, "unmatched string started at ");
+    data = data.subview(1).after;
+    if (data.size() == 0) return { token::string, origin };
+
+    auto len = static_cast<unsigned>(data.begin() - origin.begin());
+    jute::view val { origin.begin(), len };
+    return { token::string, val };
+  }
+
   constexpr token::list tokenise(jute::view data) {
     token::list res {};
     while (data.size()) {
-      const auto err = [&] (const char * msg) {
-        silog::die("%s [%.*s]",
-            msg,
-            static_cast<unsigned>(data.size() > 20 ? 20 : data.size()),
-            data.begin());
-      };
       const auto push = [&] (auto t) {
         auto [l, r] = data.subview(1);
         res.push_back({ t, l });
@@ -68,9 +86,8 @@ namespace jason {
           auto [l, r] = data.subview(v.size());
           res.push_back({ t, l });
           data = r;
-        } else err("unexpected input starting at ");
+        } else err(data, "unexpected input starting at ");
       };
-      jute::view origin = data;
       switch (data[0]) { 
         case '[': push(token::l_bracket); break;
         case ']': push(token::r_bracket); break;
@@ -81,6 +98,7 @@ namespace jason {
         case 't': push_if(token::boolean, "true"); break;
         case 'f': push_if(token::boolean, "false"); break;
         case 'n': push_if(token::null, "null"); break;
+        case '"': res.push_back(take_string(data)); break;
         case ' ':
         case '\t':
         case '\r':
@@ -88,6 +106,7 @@ namespace jason {
         case '-': data = data.subview(1).after; // fall-through
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9': {
+          jute::view origin = data;
           while (data.size() && data[0] >= '0' && data[0] <= '9') {
             data = data.subview(0, 1).after;
           }
@@ -100,29 +119,12 @@ namespace jason {
           auto len = data.size() == 0
             ? origin.size()
             : static_cast<unsigned>(data.begin() - origin.begin());
-          if (len == 1 && origin[0] == '-') err("invalid number at ");
+          if (len == 1 && origin[0] == '-') err(origin, "invalid number at ");
           jute::view val { origin.begin(), len };
           res.push_back({ token::number, val });
           break;
         }
-        case '"': {
-          do {
-            data = data.subview(1).after;
-            if (data.size() && data[0] == '\\') data = data.subview(2).after;
-          } while (data.size() && data[0] != '"');
-  
-          if (data.size() == 0) {
-            data = origin;
-            err("unmatched string started at ");
-          }
-          data = data.subview(1).after;
-  
-          auto len = static_cast<unsigned>(data.begin() - origin.begin());
-          jute::view val { origin.begin(), len };
-          res.push_back({ token::string, val });
-          break;
-        }
-        default: err("unexpected input starting at ");
+        default: err(data, "unexpected input starting at ");
       }
     }
     return res;
@@ -366,6 +368,11 @@ static_assert([] {
 static_assert([] {
   auto json = jason::parse("");
   return true;
+}());
+static_assert([] {
+  auto json = jason::parse(R"("test")");
+  using namespace jason::ast::nodes;
+  return *cast<string>(json).str() == "test";
 }());
 static_assert([] {
   auto json = jason::parse("0");
