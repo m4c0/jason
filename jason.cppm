@@ -323,8 +323,11 @@ namespace jason::ast {
     }
   }
 
+  export template<typename N> constexpr bool isa(const node_ptr & node) {
+    return node->type() == N::type;
+  }
   export template<typename N> constexpr const N & cast(const node_ptr & node) {
-    if (node->type() != N::type) silog::die("expecting type %d got %d", N::type, node->type());
+    if (!isa<N>(node)) silog::die("expecting type %d got %d", N::type, node->type());
     return static_cast<const N &>(*node);
   }
 }
