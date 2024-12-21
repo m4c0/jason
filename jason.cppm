@@ -160,6 +160,33 @@ namespace jason::ast {
   };
   export using node_ptr = hai::uptr<node>;
 
+  constexpr void unescape_u(char *& ptr, jute::view code_s) {
+    unsigned code {};
+    for (auto c : code_s) {
+      if (c >= '0' && c <= '9') {
+        code = code * 16 + (c - '0');
+        continue;
+      }
+      c |= 0x20;
+      if (c >= 'a' && c <= 'f') {
+        code = code * 16 + (c - 'a' + 10);
+        continue;
+      }
+      err(code_s, "invalid escaped unicode");
+    }
+    if (code <= 0x7F) {
+      *ptr = (code & 0xFF);
+      return;
+    }
+    if (code <= 0x7FF) {
+      *  ptr = 0xC0 | (code >> 6);
+      *++ptr = 0x80 | (code & 0x3F);
+      return;
+    }
+
+    err(code_s, "unsupported escaped unicode");
+  }
+
   [[nodiscard]] constexpr auto unescape(jute::view txt) {
     hai::array<char> buffer { static_cast<unsigned>(txt.size()) };
     auto ptr = buffer.begin();
@@ -172,6 +199,10 @@ namespace jason::ast {
       switch (auto c = txt[i + 1]) {
         case 'n': *ptr = '\n'; break;
         case 't': *ptr = '\t'; break;
+        case 'u':
+          unescape_u(ptr, txt.subview(i + 2, 4).middle);
+          i += 4;
+          break;
         default: *ptr = c;
       }
       i++;
@@ -183,6 +214,8 @@ namespace jason::ast {
   static_assert(*unescape("\"a\\sdf\"") == "asdf");
   static_assert(*unescape("\"a\\ndf\"") == "a\ndf");
   static_assert(*unescape("\"a\\\"sdf\"") == "a\"sdf");
+  static_assert(*unescape("\"a\\u0040sdf\"") == "a@sdf");
+  static_assert(*unescape("\"a\\u010csdf\"") == "a\u010csdf");
 }
 export namespace jason::ast::nodes {
   class dict : public node_typed<ast::dict> {
