@@ -117,6 +117,15 @@ namespace jason {
               data = data.subview(0, 1).after;
             }
           }
+          if (data.size() && (data[0] | 0x20) == 'e') {
+            data = data.subview(0, 1).after;
+            if (data.size() && (data[0] == '-' || data[0] == '+')) {
+              data = data.subview(0, 1).after;
+            }
+            while (data.size() && data[0] >= '0' && data[0] <= '9') {
+              data = data.subview(0, 1).after;
+            }
+          }
           auto len = data.size() == 0
             ? origin.size()
             : static_cast<unsigned>(data.begin() - origin.begin());
