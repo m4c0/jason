@@ -276,16 +276,8 @@ export namespace jason::ast::nodes {
   public:
     explicit constexpr number(jute::view cnt) : m_raw { cnt } {}
     constexpr auto raw() const { return m_raw; }
-    constexpr auto integer() const {
-      auto d = (m_raw[0] == '-') ? m_raw.subview(0, 1).after : m_raw;
-      int res {};
-      while (d.size()) {
-        res = res * 10 + (d[0] - '0');
-        d = d.subview(0, 1).after;
-      }
-      if (m_raw[0] == '-') res *= -1;
-      return res;
-    }
+    constexpr auto integer() const { return jute::to_u32(m_raw); }
+    constexpr auto real() const { return jute::to_f(m_raw); }
   };
   class boolean : public node_typed<ast::boolean> {
     bool m_val {};
