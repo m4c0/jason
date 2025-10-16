@@ -5,7 +5,7 @@ import hashley;
 import jute;
 
 namespace jason {
-  struct error {
+  export struct error {
     const char * what;
   };
   [[noreturn]] constexpr void err(const char * msg) {
