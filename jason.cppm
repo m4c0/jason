@@ -285,8 +285,16 @@ export namespace jason::ast::nodes {
   public:
     explicit constexpr number(jute::view cnt) : m_raw { cnt } {}
     constexpr auto raw() const { return m_raw; }
-    constexpr auto integer() const { return jute::to_u32(m_raw); }
-    constexpr auto real() const { return jute::to_f(m_raw); }
+    constexpr auto integer() const {
+      auto [n, ok] = jute::to_u32(m_raw);
+      if (!ok) err(m_raw, "not an integer");
+      return n;
+    }
+    constexpr auto real() const {
+      auto [n, ok] = jute::to_f(m_raw);
+      if (!ok) err(m_raw, "not a real");
+      return n;
+    }
   };
   class boolean : public node_typed<ast::boolean> {
     bool m_val {};

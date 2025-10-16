@@ -18,7 +18,7 @@ int main() try {
       auto & subj = cast<dict>(notif["subject"]);
 
       auto id = cast<string>(notif["id"]).str();
-      auto reason = cast<string>(notif["reason"]).str() + "                    ";
+      jute::heap reason = cast<string>(notif["reason"]).str() + "                    ";
       auto title = cast<string>(subj["title"]).str();
       putln(id, ' ', (*reason).subview(0, 20).middle, title);
     }
