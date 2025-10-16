@@ -3,8 +3,20 @@ export module jason;
 import hai;
 import hashley;
 import jute;
-import silog;
 
+namespace jason {
+  struct error {
+    const char * what;
+  };
+  [[noreturn]] constexpr void err(const char * msg) {
+    throw error { msg };
+  }
+  [[noreturn]] constexpr void err(jute::view data, const char * msg) {
+    // TODO: add to error
+    auto _ = data.subview(0, 20);
+    throw error { msg };
+  }
+}
 namespace jason::token {
   enum type {
     error,
@@ -32,11 +44,11 @@ namespace jason::token {
     constexpr void reset() { m_it = static_cast<const hai::chain<t> &>(m_list).begin(); }
 
     constexpr auto peek() {
-      if (!*this) silog::die("end of token list");
+      if (!*this) err("end of token list");
       return *m_it; 
     }
     constexpr auto take() {
-      if (!*this) silog::die("end of token list");
+      if (!*this) err("end of token list");
       auto res = *m_it;
       auto _ = ++m_it;
       return res;
@@ -49,13 +61,6 @@ namespace jason::token {
 }
 
 namespace jason {
-  [[noreturn]] constexpr void err(jute::view data, const char * msg) {
-    silog::die("%s [%.*s]",
-        msg,
-        static_cast<unsigned>(data.size() > 20 ? 20 : data.size()),
-        data.begin());
-  }
-
   constexpr token::t take_string(jute::view & data) {
     jute::view origin = data;
 
@@ -237,7 +242,7 @@ export namespace jason::ast::nodes {
   public:
     constexpr void push_back(jute::heap key, node * value) {
       auto & k = m_keys[*key];
-      if (k) silog::die("duplicate key found in dict");
+      if (k) err("duplicate key found in dict");
       m_values.push_back({ key, hai::uptr { value }});
       k = m_values.size();
     }
@@ -248,7 +253,7 @@ export namespace jason::ast::nodes {
 
     [[nodiscard]] constexpr auto & operator[](jute::view key) const {
       auto k = m_keys[key];
-      if (!k) silog::die("key not found in dict: [%s]", key.cstr().begin());
+      if (!k) err(key, "key not found in dict");
       return m_values.seek(k - 1).value;
     }
 
@@ -264,7 +269,7 @@ export namespace jason::ast::nodes {
     }
 
     [[nodiscard]] constexpr auto & operator[](unsigned idx) const {
-      if (idx >= m_data.size()) silog::die("accessing element outside array bounds");
+      if (idx >= m_data.size()) err("accessing element outside array bounds");
       return m_data.seek(idx);
     }
 
@@ -311,7 +316,7 @@ namespace jason::ast {
   constexpr node * parse_dict(token::list & ts);
 
   [[noreturn]] void fail(const char * msg, token::t t) {
-    silog::die("%s: %.*s", msg, static_cast<int>(t.content.size()), t.content.begin());
+    err(t.content, msg);
   }
 
   constexpr node * parse_array(token::list & ts) {
@@ -330,7 +335,7 @@ namespace jason::ast {
         default: fail("invalid token while parsing array before", ts.peek());
       }
     }
-    silog::die("end of file while parsing array");
+    err("end of file while parsing array");
   }
   constexpr node * parse_dict(token::list & ts) {
     nodes::dict res {};
@@ -350,12 +355,12 @@ namespace jason::ast {
             default: fail("invalid token after dict entry", key);
           }
         }
-        silog::die("end of file while parsing dict");
+        err("end of file while parsing dict");
       default: fail("invalid token while parsing dict", ts.peek());
     }
   }
   constexpr node * parse(token::list & ts) {
-    if (!ts) silog::die("eof trying to parse a value");
+    if (!ts) err("eof trying to parse a value");
 
     auto [t, cnt] = ts.take();
     switch (t) {
@@ -373,7 +378,7 @@ namespace jason::ast {
     return node->type() == N::type;
   }
   export template<typename N> constexpr const N & cast(const node_ptr & node) {
-    if (!isa<N>(node)) silog::die("expecting type %d got %d", N::type, node->type());
+    if (!isa<N>(node)) err("expecting different type"); // TODO: exp N::type got node->type()
     return static_cast<const N &>(*node);
   }
 }
